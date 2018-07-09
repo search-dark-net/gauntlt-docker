@@ -1,10 +1,10 @@
-FROM ubuntu:16.04
+FROM debian:9
 MAINTAINER james@gauntlt.org
 
 ARG ARACHNI_VERSION=arachni-1.5.1-0.5.12
+WORKDIR /opt
 
-# Install Ruby and other OS stuff
-RUN apt-get update && \
+RUN apt-get update -y && \
     apt-get install -y build-essential \
       bzip2 \
       ca-certificates \
@@ -24,28 +24,22 @@ RUN apt-get update && \
       python2.7-dev \
       ruby \
       ruby-dev \
-      ruby-bundler && \
+      ruby-bundler \
+      nmap \
+      libtimedate-perl libnet-ssleay-perl && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Gauntlt
-RUN gem install ffi -v 1.9.18
-RUN gem install gauntlt --no-rdoc --no-ri
-
-# Install Attack tools
-WORKDIR /opt
+# Gauntlt
+RUN gem install ffi -v 1.9.18 && gem install gauntlt --no-rdoc --no-ri
 
 # arachni
 RUN wget https://github.com/Arachni/arachni/releases/download/v1.5.1/${ARACHNI_VERSION}-linux-x86_64.tar.gz && \
     tar xzvf ${ARACHNI_VERSION}-linux-x86_64.tar.gz > /dev/null && \
+    rm -f ${ARACHNI_VERSION}-linux-x86_64.tar.gz && \
     mv ${ARACHNI_VERSION} /usr/local && \
     ln -s /usr/local/${ARACHNI_VERSION}/bin/* /usr/local/bin/
 
-# Nikto
-RUN apt-get update && \
-    apt-get install -y libtimedate-perl \
-      libnet-ssleay-perl && \
-    rm -rf /var/lib/apt/lists/*
-
+# nikto
 RUN git clone --depth=1 https://github.com/sullo/nikto.git && \
     cd nikto/program && \
     echo "EXECDIR=/opt/nikto/program" >> nikto.conf && \
@@ -54,14 +48,14 @@ RUN git clone --depth=1 https://github.com/sullo/nikto.git && \
     ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
 
 # sqlmap
-WORKDIR /opt
 ENV SQLMAP_PATH /opt/sqlmap/sqlmap.py
 RUN git clone --depth=1 https://github.com/sqlmapproject/sqlmap.git
 
 # dirb
-COPY vendor/dirb222.tar.gz dirb222.tar.gz
-
-RUN tar xvfz dirb222.tar.gz > /dev/null && \
+RUN wget -O- https://sourceforge.net/projects/dirb/files/dirb/2.22/dirb222.tar.gz/download > dirb222.tar.gz && \
+    tar xvfz dirb222.tar.gz > /dev/null && \
+    rm -f dirb222.tar.gz && \
+    chmod -R +X dirb222 && \
     cd dirb222 && \
     chmod 755 ./configure && \
     ./configure && \
@@ -69,10 +63,5 @@ RUN tar xvfz dirb222.tar.gz > /dev/null && \
     ln -s /opt/dirb222/dirb /usr/local/bin/dirb
 
 ENV DIRB_WORDLISTS /opt/dirb222/wordlists
-
-# nmap
-RUN apt-get update && \
-    apt-get install -y nmap && \
-    rm -rf /var/lib/apt/lists/*
 
 ENTRYPOINT [ "/usr/local/bin/gauntlt" ]
